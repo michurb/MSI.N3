@@ -1,0 +1,60 @@
+
+# def visualize_som_2d(som, data, map_size):
+#     fig, ax = plt.subplots(figsize=(10, 10))
+#
+#     min_val = np.min(data, axis=0)
+#     max_val = np.max(data, axis=0)
+#
+#     cmap = plt.cm.viridis
+#
+#     # Rysowanie próbek jako punktów
+#     for input_vector in data:
+#         x, y = som._find_winner(input_vector)
+#         intensity = (input_vector[0] - min_val[0]) / (max_val[0] - min_val[0])
+#         color = cmap(intensity)
+#         ax.scatter(x, y, marker='o', s=50, color=color, edgecolors='k')
+#
+#     # Rysowanie reprezentantów klastrów jako większych okręgów
+#     for i in range(map_size[0]):
+#         for j in range(map_size[1]):
+#             intensity = (som.weights[i, j, 0] - min_val[0]) / (max_val[0] - min_val[0])
+#             color = cmap(intensity)
+#             ax.scatter(i, j, marker='o', s=200, color=color, edgecolors='k', linewidths=2)
+#             # Dodawanie okręgu wokół reprezentanta klastra
+#             circle = Circle((i, j), 0.5, fill=False, edgecolor='r', linewidth=1)
+#             ax.add_patch(circle)
+#
+#     # Dodanie legendy dla intensywności koloru
+#     cbar = plt.colorbar(plt.cm.ScalarMappable(cmap=cmap), ax=ax)
+#     cbar.set_label('Intensity')
+#
+#     plt.xticks(range(map_size[0]))
+#     plt.yticks(range(map_size[1]))
+#     plt.grid(True)
+#     plt.show()
+
+
+# Wizualizacja wyników w przestrzeni 2D
+def visualize_som_2d_multiple(som, data, map_size, ax, title=""):
+    min_val = np.min(data, axis=0)
+    max_val = np.max(data, axis=0)
+    cmap = plt.cm.viridis
+
+    for input_vector in data:
+        x, y = som._find_winner(input_vector)
+        intensity = (input_vector[0] - min_val[0]) / (max_val[0] - min_val[0])
+        color = cmap(intensity)
+        ax.scatter(x, y, marker='o', s=50, color=color, edgecolors='k')
+
+    for i in range(map_size[0]):
+        for j in range(map_size[1]):
+            intensity = (som.weights[i, j, 0] - min_val[0]) / (max_val[0] - min_val[0])
+            color = cmap(intensity)
+            ax.scatter(i, j, marker='o', s=200, color=color, edgecolors='k', linewidths=2)
+            circle = Circle((i, j), 0.5, fill=False, edgecolor='r', linewidth=1)
+            ax.add_patch(circle)
+
+    ax.set_title(title)
+    ax.set_xticks(range(map_size[0]))
+    ax.set_yticks(range(map_size[1]))
+    ax.grid(True)
