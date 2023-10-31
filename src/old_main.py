@@ -250,39 +250,6 @@ def graphs2(learning_rates, map_sizes, radii, feature_vectors, labels, output_di
 
                 plt.close(fig)  # Close the figure after saving
 
-
-def visualize_som_clusters(cluster_centers, samples, ax):
-    """
-    Visualizes the SOM clusters and samples.
-
-    Parameters:
-    - cluster_centers: The cluster centers obtained from the SOM.
-    - samples: The samples or data points.
-    - ax: The matplotlib axis object to plot on.
-    """
-    # Plotting cluster centers
-    for center in cluster_centers:
-        ax.scatter(center[0], center[1], color='black', s=100)
-
-        # Find the distance to the nearest other cluster center to set the influence radius
-        other_centers = [c for c in cluster_centers if not np.array_equal(c, center)]
-        distances = [np.linalg.norm(center - c) for c in other_centers]
-        influence_radius = min(distances) / 2
-        circle = plt.Circle((center[0], center[1]), radius=influence_radius, color='red', fill=False)
-        ax.add_artist(circle)
-
-    # Plotting samples
-    ax.scatter(samples[:, 0], samples[:, 1], color='blue', s=30, label='Data Sample')
-
-    ax.set_xlim([-1, cluster_centers[:, 0].max() + 2])
-    ax.set_ylim([-1, cluster_centers[:, 1].max() + 2])
-    ax.set_xlabel('SOM X-coordinate')
-    ax.set_ylabel('SOM Y-coordinate')
-    ax.grid(True)
-    ax.legend(loc='upper right')
-    ax.grid(True)
-
-
 def single_plot(learning_rates, map_sizes, radii, feature_vectors, labels):
     figure_size = (map_sizes[0] + 2, map_sizes[1] + 2)
     fig, ax = plt.subplots(figsize=figure_size)
@@ -301,24 +268,6 @@ def single_plot(learning_rates, map_sizes, radii, feature_vectors, labels):
 
     plt.show()
 
-def visualize_som_results(som, feature_vectors):
-    """Visualizes the SOM results using the given feature vectors."""
-    # Extracting cluster centers from SOM weights
-    cluster_centers = np.array([som.weights[i, j] for i in range(som.map_size[0]) for j in range(som.map_size[1])])
-
-    # Mapping feature vectors to the SOM to get their coordinates
-    samples_coords = np.array([som._find_winner(vec) for vec in feature_vectors])
-
-    # Convert samples_coords to a format suitable for visualization (i.e., [[x1, y1], [x2, y2], ...])
-    samples = np.array([(coord[0] + np.random.normal(0, 0.05), coord[1] + np.random.normal(0, 0.05)) for coord in samples_coords])
-
-    # Plotting
-    fig, ax = plt.subplots(figsize=(10, 10))
-    visualize_som_clusters(cluster_centers, samples, ax)
-    plt.show()
-
-
-
 def main():
     car_images, edge_images, labels = load_and_preprocess_data()
     feature_vectors = np.array([extract_features_from_edge_image(img) for img in edge_images])
@@ -330,16 +279,20 @@ def main():
     learning_rates = [0.1, 0.5, 0.9]
     radii = [0.5, 1.0, 2.0]
     map_sizes = [(5, 5), (10, 10), (15, 15), (20, 20)]
-    #single_plot(0.95,(15,15),1.0,feature_vectors_rgb, labels)
-    #single_plot(0.95, (15, 15), 1.0, feature_vectors, labels)
+    single_plot(0.95,(15,15),1.0,feature_vectors_rgb, labels)
+    single_plot(0.95, (15, 15), 1.0, feature_vectors, labels)
 
-    som = SOM(input_dim=4, map_size=(15, 15), learning_rate=0.95, radius=1.0)
-    som.train(feature_vectors_rgb, epochs=10)
-    visualize_som_results(som, feature_vectors_rgb)  # Visualize using the new function
-
-    som = SOM(input_dim=4, map_size=(15, 15), learning_rate=0.95, radius=1.0)
-    som.train(feature_vectors, epochs=10)
-    visualize_som_results(som, feature_vectors)
+    # Create a directory named by the current date and time
+    # current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # output_directory = os.path.join(os.getcwd(), "..", "results", "GRAPH1")
+    # os.makedirs(output_directory, exist_ok=True)
+    # graphs1(learning_rates,map_sizes,radii, feature_vectors, output_directory)
+    #
+    # current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # output_directory = os.path.join(os.getcwd(), "..", "results", "GRAPH2")
+    # os.makedirs(output_directory, exist_ok=True)
+    # graphs2(learning_rates, map_sizes, radii, feature_vectors, labels, output_directory)
+    plot_images(car_images, edge_images)
 
 if __name__ == "__main__":
     main()
