@@ -5,15 +5,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 from keras.datasets import cifar10
-#from sklearn.metrics import silhouette_score
-from matplotlib.lines import Line2D
+import itertools
+from multiprocessing import Pool, cpu_count
 
 def load_and_preprocess_data():
     """Load CIFAR-10 data and preprocess it to extract car images, their edge images, and their labels."""
     (x_train, y_train), _ = cifar10.load_data()
     car_indices = np.where((y_train == 1) | (y_train == 9))[0]
-    car_images = x_train[car_indices]
-    labels = y_train[car_indices]
+    car_images = x_train[car_indices][:100]
+    labels = y_train[car_indices][:100]
     edge_images = [cv2.Canny(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), 100, 200) for img in car_images]
     return car_images, np.array(edge_images), labels
 
@@ -43,12 +43,23 @@ class SOM:
         return np.unravel_index(distances.argmin(), distances.shape)
 
     def _update_weights(self, input_vector, winner_coords):
-        for i in range(self.map_size[0]):
-            for j in range(self.map_size[1]):
-                dist_to_winner = self._calculate_distance(np.array([i, j]), np.array(winner_coords))
-                if dist_to_winner <= self.radius:
-                    influence = np.exp(-dist_to_winner / (2 * (self.radius ** 2)))
-                    self.weights[i, j] += self.learning_rate * influence * (input_vector - self.weights[i, j])
+        # Calculate the distance from each neuron to the winner
+        x = np.arange(self.map_size[0])
+        y = np.arange(self.map_size[1])
+        dist_x, dist_y = np.meshgrid(x, y)
+        dist_to_winner = np.sqrt((dist_x - winner_coords[0]) ** 2 + (dist_y - winner_coords[1]) ** 2)
+
+        # Only consider neurons within the given radius
+        mask = dist_to_winner <= self.radius
+
+        # Calculate the influence
+        influence = np.exp(-dist_to_winner / (2 * (self.radius ** 2)))
+        influence = influence * mask
+
+        # Update weights for the influenced neurons
+        delta = input_vector - self.weights
+        for i in range(self.weights.shape[2]):
+            self.weights[:, :, i] += self.learning_rate * influence * delta[:, :, i]
 
     def train(self, data, epochs):
         for _ in range(epochs):
@@ -152,5 +163,50 @@ def main():
     visualize_som_results(map_size, feature_vectors, learning_rates, radii, epochs_list, "result/run1")
 
 
+def train_and_visualize(params):
+    map_size, feature_vectors, learning_rate, radius, epochs, output_directory = params
+    som = SOM(input_dim=4, map_size=map_size, learning_rate=learning_rate, radius=radius)
+    som.train(feature_vectors, epochs)
+
+    # Extracting cluster centers from SOM weights
+    cluster_centers = np.array([som.weights[i, j] for i in range(som.map_size[0]) for j in range(som.map_size[1])])
+    samples_coords = np.array([som._find_winner(vec) for vec in feature_vectors])
+    samples = np.array(
+        [(coord[0] + np.random.normal(0, 0.05), coord[1] + np.random.normal(0, 0.05)) for coord in samples_coords])
+
+    fig, ax = plt.subplots(figsize=(10, 10))
+    visualize_som_clusters(cluster_centers, samples, ax)
+    ax.set_title(f"Learning Rate: {learning_rate}, Radius: {radius}, Epochs: {epochs}", fontsize=12)
+
+    if not os.path.exists(output_directory):
+        os.makedirs(output_directory)
+
+    filename = f"LR_{learning_rate}_Radius_{radius}_Epochs_{epochs}.png"
+    filepath = os.path.join(output_directory, filename)
+    plt.savefig(filepath)
+
+    plt.close(fig)  # Close the figure after saving
+
+
+def main_parallel():
+    car_images, edge_images, labels = load_and_preprocess_data()
+    feature_vectors = np.array([extract_features_from_edge_image(img) for img in edge_images])
+
+    learning_rates = [0.1, 0.5, 0.9]
+    radii = [0.5, 1.0, 2.0]
+    epochs_list = [100, 1000, 10000]
+    map_size = (20, 20)
+    output_directory = "result/run_parallel"
+
+    # Create all combinations of hyperparameters
+    params = itertools.product([map_size], [feature_vectors], learning_rates, radii, epochs_list, [output_directory])
+
+    # Get the number of available CPUs
+    num_processes = cpu_count()
+
+    # Initialize the Pool and map the function to the hyperparameters
+    with Pool(num_processes) as pool:
+        pool.map(train_and_visualize, params)
+
 if __name__ == "__main__":
-    main()
+    main_parallel()
