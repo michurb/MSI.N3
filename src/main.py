@@ -46,8 +46,8 @@ class SOM:
         self.map_size = map_size
         self.learning_rate = learning_rate
         self.radius = radius
-        random_indices = np.random.randint(data.shape[0], size=(map_size[0], map_size[1]))
-        self.weights = data[random_indices]
+        self.weights = np.random.rand(map_size[0], map_size[1], self.input_dim)
+
 
     def _calculate_distance(self, x, y):
         return np.linalg.norm(x - y)
@@ -76,7 +76,11 @@ class SOM:
             self.weights[:, :, i] += self.learning_rate * influence * delta[:, :, i]
 
     def train(self, data, epochs):
-        for _ in range(epochs):
+        initial_lr = self.learning_rate
+        initial_radius = self.radius
+        for epoch in range(epochs):
+            self.learning_rate = initial_lr * (1 - epoch / float(epochs))
+            self.radius = initial_radius * (1 - epoch / float(epochs))
             for input_vector in data:
                 winner_coords = self._find_winner(input_vector)
                 self._update_weights(input_vector, winner_coords)
@@ -113,9 +117,6 @@ def visualize_som_clusters(cluster_centers, samples, ax):
     ax.legend(loc='upper right')
     ax.grid(True)
 
-
-
-
 def visualize_som_results(map_size, feature_vectors, learning_rates, radii, epochs_list, output_directory="result"):
     """Visualizes the SOM results for varying learning rates, radii, and epochs. Saves plots to the specified directory."""
     for lr in learning_rates:
@@ -132,26 +133,53 @@ def visualize_som_results(map_size, feature_vectors, learning_rates, radii, epoc
                 # Mapping feature vectors to the SOM to get their coordinates
                 samples_coords = np.array([som._find_winner(vec) for vec in feature_vectors])
 
-                # Convert samples_coords to a format suitable for visualization
-                samples = np.array([(coord[0] + np.random.normal(0, 0.05), coord[1] + np.random.normal(0, 0.05)) for coord in samples_coords])
+                # Convert samples_coords with a smaller jitter
+                samples = np.array(
+                    [(coord[0] + np.random.normal(0, 0.03), coord[1] + np.random.normal(0, 0.03)) for coord in
+                     samples_coords])
 
                 # Plotting
                 fig, ax = plt.subplots(figsize=(10, 10))
+                #inny rodzaj graphow
                 visualize_som_clusters(cluster_centers, samples, ax)
                 ax.set_title(f"Learning Rate: {lr}, Radius: {r}, Epochs: {ep}", fontsize=12)
 
-                # Ensure the directory exists, if not create it
-                if not os.path.exists(output_directory):
-                    os.makedirs(output_directory)
+                # Adjusting visualization scale based on both samples and cluster centers
+                all_points_x = np.concatenate([samples[:, 0], cluster_centers[:, 0]])
+                all_points_y = np.concatenate([samples[:, 1], cluster_centers[:, 1]])
+                ax.set_xlim([all_points_x.min() - 1, all_points_x.max() + 1])
+                ax.set_ylim([all_points_y.min() - 1, all_points_y.max() + 1])
 
                 # Save the plot to the directory
                 filename = f"LR_{lr}_Radius_{r}_Epochs_{ep}.png"
                 filepath = os.path.join(output_directory, filename)
                 plt.savefig(filepath)
 
-                plt.close(fig)  # Close the figure after saving
+                plt.close(fig)
 
+def train_and_visualize(params):
+    map_size, feature_vectors, learning_rate, radius, epochs, output_directory = params
+    som = SOM(input_dim=6, map_size=map_size, data=feature_vectors, learning_rate=learning_rate, radius=radius)
+    som.train(feature_vectors, epochs)
 
+    # Extracting cluster centers from SOM weights
+    cluster_centers = np.array([som.weights[i, j] for i in range(som.map_size[0]) for j in range(som.map_size[1])])
+    samples_coords = np.array([som._find_winner(vec) for vec in feature_vectors])
+    samples = np.array(
+        [(coord[0] + np.random.normal(0, 0.2), coord[1] + np.random.normal(0, 0.2)) for coord in samples_coords])
+
+    fig, ax = plt.subplots(figsize=(10, 10))
+    visualize_som_clusters(cluster_centers, samples, ax)
+    ax.set_title(f"Learning Rate: {learning_rate}, Radius: {radius}, Epochs: {epochs}", fontsize=12)
+
+    if not os.path.exists(output_directory):
+        os.makedirs(output_directory)
+
+    filename = f"LR_{learning_rate}_Radius_{radius}_Epochs_{epochs}.png"
+    filepath = os.path.join(output_directory, filename)
+    plt.savefig(filepath)
+
+    plt.close(fig)  # Close the figure after saving
 
 def main():
     # Visualization generations based on different parameters
@@ -177,30 +205,6 @@ def main():
     feature_vectors = np.array([extract_features_from_colored_image(img) for img in car_images])
     visualize_som_results(map_size, feature_vectors, learning_rates, radii, epochs_list, "result/runCOLOR")
 
-def train_and_visualize(params):
-    map_size, feature_vectors, learning_rate, radius, epochs, output_directory = params
-    som = SOM(input_dim=6, map_size=map_size, data=feature_vectors, learning_rate=learning_rate, radius=radius)
-    som.train(feature_vectors, epochs)
-
-    # Extracting cluster centers from SOM weights
-    cluster_centers = np.array([som.weights[i, j] for i in range(som.map_size[0]) for j in range(som.map_size[1])])
-    samples_coords = np.array([som._find_winner(vec) for vec in feature_vectors])
-    samples = np.array(
-        [(coord[0] + np.random.normal(0, 0.05), coord[1] + np.random.normal(0, 0.05)) for coord in samples_coords])
-
-    fig, ax = plt.subplots(figsize=(10, 10))
-    visualize_som_clusters(cluster_centers, samples, ax)
-    ax.set_title(f"Learning Rate: {learning_rate}, Radius: {radius}, Epochs: {epochs}", fontsize=12)
-
-    if not os.path.exists(output_directory):
-        os.makedirs(output_directory)
-
-    filename = f"LR_{learning_rate}_Radius_{radius}_Epochs_{epochs}.png"
-    filepath = os.path.join(output_directory, filename)
-    plt.savefig(filepath)
-
-    plt.close(fig)  # Close the figure after saving
-
 
 def main_parallel():
 
@@ -211,6 +215,8 @@ def main_parallel():
     #color images
     car_images, _, _ = load_and_preprocess_data()
     feature_vectors = np.array([extract_features_from_colored_image(img) for img in car_images])
+    feature_vectors = feature_vectors - np.mean(feature_vectors, axis=0)
+    feature_vectors = feature_vectors / np.std(feature_vectors, axis=0)
 
     learning_rates = [0.1, 0.5, 0.9]
     radii = [0.5, 1.0, 2.0]
