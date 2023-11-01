@@ -26,14 +26,28 @@ def extract_features_from_edge_image(edge_image):
     white_pixel_ratio = white_pixel_count / (edge_image.shape[0] * edge_image.shape[1])
     return [mean_intensity, white_pixel_count, std_dev, white_pixel_ratio]
 
+def extract_features_from_colored_image(image):
+    """Extract features from a colored image."""
+    # Average values of RGB channels
+    avg_r = np.mean(image[:, :, 0])
+    avg_g = np.mean(image[:, :, 1])
+    avg_b = np.mean(image[:, :, 2])
+
+    # Standard deviation of RGB channels
+    std_r = np.std(image[:, :, 0])
+    std_g = np.std(image[:, :, 1])
+    std_b = np.std(image[:, :, 2])
+
+    return [avg_r, avg_g, avg_b, std_r, std_g, std_b]
 
 class SOM:
-    def __init__(self, input_dim, map_size, learning_rate=0.5, radius=1.0):
+    def __init__(self, input_dim, map_size, data, learning_rate=0.5, radius=1.0):
         self.input_dim = input_dim
         self.map_size = map_size
         self.learning_rate = learning_rate
         self.radius = radius
-        self.weights = np.random.rand(map_size[0], map_size[1], input_dim)
+        random_indices = np.random.randint(data.shape[0], size=(map_size[0], map_size[1]))
+        self.weights = data[random_indices]
 
     def _calculate_distance(self, x, y):
         return np.linalg.norm(x - y)
@@ -109,7 +123,7 @@ def visualize_som_results(map_size, feature_vectors, learning_rates, radii, epoc
             for ep in epochs_list:
 
                 # Training the SOM
-                som = SOM(input_dim=4, map_size=map_size, learning_rate=lr, radius=r)
+                som = SOM(input_dim=4, map_size=map_size, data=feature_vectors, learning_rate=lr, radius=r)
                 som.train(feature_vectors, epochs=ep)
 
                 # Extracting cluster centers from SOM weights
@@ -140,9 +154,6 @@ def visualize_som_results(map_size, feature_vectors, learning_rates, radii, epoc
 
 
 def main():
-    car_images, edge_images, labels = load_and_preprocess_data()
-    feature_vectors = np.array([extract_features_from_edge_image(img) for img in edge_images])
-
     # Visualization generations based on different parameters
     learning_rates = [0.1, 0.5, 0.9]
     radii = [0.5, 1.0, 2.0]
@@ -162,10 +173,13 @@ def main():
     # Call the function with the required parameters
     visualize_som_results(map_size, feature_vectors, learning_rates, radii, epochs_list, "result/run1")
 
+    car_images, _, _ = load_and_preprocess_data()
+    feature_vectors = np.array([extract_features_from_colored_image(img) for img in car_images])
+    visualize_som_results(map_size, feature_vectors, learning_rates, radii, epochs_list, "result/runCOLOR")
 
 def train_and_visualize(params):
     map_size, feature_vectors, learning_rate, radius, epochs, output_directory = params
-    som = SOM(input_dim=4, map_size=map_size, learning_rate=learning_rate, radius=radius)
+    som = SOM(input_dim=6, map_size=map_size, data=feature_vectors, learning_rate=learning_rate, radius=radius)
     som.train(feature_vectors, epochs)
 
     # Extracting cluster centers from SOM weights
@@ -189,14 +203,20 @@ def train_and_visualize(params):
 
 
 def main_parallel():
-    car_images, edge_images, labels = load_and_preprocess_data()
-    feature_vectors = np.array([extract_features_from_edge_image(img) for img in edge_images])
+
+    #edge images
+    # car_images, edge_images, labels = load_and_preprocess_data()
+    # feature_vectors = np.array([extract_features_from_edge_image(img) for img in edge_images])
+
+    #color images
+    car_images, _, _ = load_and_preprocess_data()
+    feature_vectors = np.array([extract_features_from_colored_image(img) for img in car_images])
 
     learning_rates = [0.1, 0.5, 0.9]
     radii = [0.5, 1.0, 2.0]
     epochs_list = [100, 1000, 10000]
     map_size = (20, 20)
-    output_directory = "result/run_parallel"
+    output_directory = "result/run_parallelCOLOR"
 
     # Create all combinations of hyperparameters
     params = itertools.product([map_size], [feature_vectors], learning_rates, radii, epochs_list, [output_directory])
