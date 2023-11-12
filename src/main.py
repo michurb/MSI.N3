@@ -132,7 +132,7 @@ def train_and_visualize(params):
 
     fig, ax = plt.subplots(figsize=(10, 10))
     visualize_som_clusters(cluster_centers, samples, ax)
-    ax.set_title(f"Learning Rate: {learning_rate}, Radius: {radius}, Epochs: {epochs}", fontsize=12)
+    ax.set_title(f"Wspolczynnik uczenia: {learning_rate}, Promien: {radius}, Epoki: {epochs}", fontsize=12)
 
     if not os.path.exists(output_directory):
         os.makedirs(output_directory)
@@ -204,7 +204,7 @@ def main():
 def main_parallel():
     learning_rates = [0.3, 0.1, 0.05, 0.01]
     radii = [10, 5, 2.5, 1.25, 1]
-    epochs_list = [1, 1000, 100000]
+    epochs_list = [1, 1000, 50000]
     map_size = (20, 20)
     output_directory_color = "result/run_parallelCOLOR"
     output_directory_edge = "result/run_parallelEDGE"
