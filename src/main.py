@@ -8,12 +8,13 @@ from keras.datasets import cifar10
 import itertools
 from multiprocessing import Pool, cpu_count
 
+
 def load_and_preprocess_data():
     """Load CIFAR-10 data and preprocess it to extract car images, their edge images, and their labels."""
     (x_train, y_train), _ = cifar10.load_data()
     car_indices = np.where((y_train == 1) | (y_train == 9))[0]
-    car_images = x_train[car_indices][:100]
-    labels = y_train[car_indices][:100]
+    car_images = x_train[car_indices]
+    labels = y_train[car_indices]
     edge_images = [cv2.Canny(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), 100, 200) for img in car_images]
     return car_images, np.array(edge_images), labels
 
@@ -25,6 +26,7 @@ def extract_features_from_edge_image(edge_image):
     std_dev = np.std(edge_image)
     white_pixel_ratio = white_pixel_count / (edge_image.shape[0] * edge_image.shape[1])
     return [mean_intensity, white_pixel_count, std_dev, white_pixel_ratio]
+
 
 def extract_features_from_colored_image(image):
     """Extract features from a colored image."""
@@ -40,6 +42,7 @@ def extract_features_from_colored_image(image):
 
     return [avg_r, avg_g, avg_b, std_r, std_g, std_b]
 
+
 class SOM:
     def __init__(self, input_dim, map_size, data, learning_rate=0.5, radius=1.0):
         self.input_dim = input_dim
@@ -47,7 +50,6 @@ class SOM:
         self.learning_rate = learning_rate
         self.radius = radius
         self.weights = np.random.rand(map_size[0], map_size[1], self.input_dim)
-
 
     def _calculate_distance(self, x, y):
         return np.linalg.norm(x - y)
@@ -107,55 +109,15 @@ def visualize_som_clusters(cluster_centers, samples, ax):
         ax.add_artist(circle)
 
     # Plotting samples
-    ax.scatter(samples[:, 0], samples[:, 1], color='blue', s=30, label='Data Sample')
+    ax.scatter(samples[:, 0], samples[:, 1], color='blue', s=30, label='Punkt danych')
 
     ax.set_xlim([-1, cluster_centers[:, 0].max() + 2])
     ax.set_ylim([-1, cluster_centers[:, 1].max() + 2])
-    ax.set_xlabel('SOM X-coordinate')
-    ax.set_ylabel('SOM Y-coordinate')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
     ax.grid(True)
     ax.legend(loc='upper right')
     ax.grid(True)
-
-def visualize_som_results(map_size, feature_vectors, learning_rates, radii, epochs_list, output_directory="result"):
-    """Visualizes the SOM results for varying learning rates, radii, and epochs. Saves plots to the specified directory."""
-    for lr in learning_rates:
-        for r in radii:
-            for ep in epochs_list:
-
-                # Training the SOM
-                som = SOM(input_dim=4, map_size=map_size, data=feature_vectors, learning_rate=lr, radius=r)
-                som.train(feature_vectors, epochs=ep)
-
-                # Extracting cluster centers from SOM weights
-                cluster_centers = np.array([som.weights[i, j] for i in range(som.map_size[0]) for j in range(som.map_size[1])])
-
-                # Mapping feature vectors to the SOM to get their coordinates
-                samples_coords = np.array([som._find_winner(vec) for vec in feature_vectors])
-
-                # Convert samples_coords with a smaller jitter
-                samples = np.array(
-                    [(coord[0] + np.random.normal(0, 0.03), coord[1] + np.random.normal(0, 0.03)) for coord in
-                     samples_coords])
-
-                # Plotting
-                fig, ax = plt.subplots(figsize=(10, 10))
-                #inny rodzaj graphow
-                visualize_som_clusters(cluster_centers, samples, ax)
-                ax.set_title(f"Learning Rate: {lr}, Radius: {r}, Epochs: {ep}", fontsize=12)
-
-                # Adjusting visualization scale based on both samples and cluster centers
-                all_points_x = np.concatenate([samples[:, 0], cluster_centers[:, 0]])
-                all_points_y = np.concatenate([samples[:, 1], cluster_centers[:, 1]])
-                ax.set_xlim([all_points_x.min() - 1, all_points_x.max() + 1])
-                ax.set_ylim([all_points_y.min() - 1, all_points_y.max() + 1])
-
-                # Save the plot to the directory
-                filename = f"LR_{lr}_Radius_{r}_Epochs_{ep}.png"
-                filepath = os.path.join(output_directory, filename)
-                plt.savefig(filepath)
-
-                plt.close(fig)
 
 def train_and_visualize(params):
     map_size, feature_vectors, learning_rate, radius, epochs, output_directory = params
@@ -181,43 +143,49 @@ def train_and_visualize(params):
 
     plt.close(fig)  # Close the figure after saving
 
+def visualize_som_results(map_size, feature_vectors, learning_rates, radii, epochs_list, output_directory="result"):
+    """Visualizes the SOM results for varying learning rates, radii, and epochs. Saves plots to the specified directory."""
+    for lr in learning_rates:
+        for r in radii:
+            for ep in epochs_list:
+                # Training the SOM
+                som = SOM(input_dim=4, map_size=map_size, data=feature_vectors, learning_rate=lr, radius=r)
+                som.train(feature_vectors, epochs=ep)
+
+                # Extracting cluster centers from SOM weights
+                cluster_centers = np.array(
+                    [som.weights[i, j] for i in range(som.map_size[0]) for j in range(som.map_size[1])])
+
+                # Mapping feature vectors to the SOM to get their coordinates
+                samples_coords = np.array([som._find_winner(vec) for vec in feature_vectors])
+
+                # Convert samples_coords with a smaller jitter
+                samples = np.array(
+                    [(coord[0] + np.random.normal(0, 0.03), coord[1] + np.random.normal(0, 0.03)) for coord in
+                     samples_coords])
+
+                # Plotting
+                fig, ax = plt.subplots(figsize=(10, 10))
+                # inny rodzaj graphow
+                visualize_som_clusters(cluster_centers, samples, ax)
+                ax.set_title(f"Wspolczynnik uczenia: {lr}, Promien: {r}, Epoki: {ep}", fontsize=12)
+
+                # Adjusting visualization scale based on both samples and cluster centers
+                all_points_x = np.concatenate([samples[:, 0], cluster_centers[:, 0]])
+                all_points_y = np.concatenate([samples[:, 1], cluster_centers[:, 1]])
+                ax.set_xlim([all_points_x.min() - 1, all_points_x.max() + 1])
+                ax.set_ylim([all_points_y.min() - 1, all_points_y.max() + 1])
+
+                # Save the plot to the directory
+                filename = f"LR_{lr}_Promien_{r}_Epoki_{ep}.png"
+                filepath = os.path.join(output_directory, filename)
+                plt.savefig(filepath)
+
+                plt.close(fig)
+
 def main():
-    # Visualization generations based on different parameters
-    learning_rates = [0.1, 0.5, 0.9]
-    radii = [0.5, 1.0, 2.0]
-    map_sizes = [(5, 5), (10, 10), (15, 15), (20, 20)]
-    #single_plot(0.95,(15,15),1.0,feature_vectors_rgb, labels)
-    #single_plot(0.95, (15, 15), 1.0, feature_vectors, labels)
-
-    car_images, edge_images, labels = load_and_preprocess_data()
-    feature_vectors = np.array([extract_features_from_edge_image(img) for img in edge_images])
-
-    # Initialization parameters
-    learning_rates = [0.1, 0.5, 0.9]
-    radii = [0.5, 1.0, 2.0]
-    epochs_list = [100, 1000, 10000]  # You can modify this based on your needs
-    map_size = (20, 20)
-
-    # Call the function with the required parameters
-    visualize_som_results(map_size, feature_vectors, learning_rates, radii, epochs_list, "result/run1")
-
     car_images, _, _ = load_and_preprocess_data()
     feature_vectors = np.array([extract_features_from_colored_image(img) for img in car_images])
-    visualize_som_results(map_size, feature_vectors, learning_rates, radii, epochs_list, "result/runCOLOR")
-
-
-def main_parallel():
-
-    #edge images
-    # car_images, edge_images, labels = load_and_preprocess_data()
-    # feature_vectors = np.array([extract_features_from_edge_image(img) for img in edge_images])
-
-    #color images
-    car_images, _, _ = load_and_preprocess_data()
-    feature_vectors = np.array([extract_features_from_colored_image(img) for img in car_images])
-    feature_vectors = feature_vectors - np.mean(feature_vectors, axis=0)
-    feature_vectors = feature_vectors / np.std(feature_vectors, axis=0)
-
     learning_rates = [0.1, 0.5, 0.9]
     radii = [0.5, 1.0, 2.0]
     epochs_list = [100, 1000, 10000]
@@ -225,14 +193,51 @@ def main_parallel():
     output_directory = "result/run_parallelCOLOR"
 
     # Create all combinations of hyperparameters
-    params = itertools.product([map_size], [feature_vectors], learning_rates, radii, epochs_list, [output_directory])
+    all_params = itertools.product(
+        [map_size], [feature_vectors], learning_rates, radii, epochs_list, [output_directory]
+    )
+
+    for params in all_params:
+        train_and_visualize(params)
+
+
+def main_parallel():
+    learning_rates = [0.3, 0.1, 0.05, 0.01]
+    radii = [10, 5, 2.5, 1.25, 1]
+    epochs_list = [1, 1000, 100000]
+    map_size = (20, 20)
+    output_directory_color = "result/run_parallelCOLOR"
+    output_directory_edge = "result/run_parallelEDGE"
+
+    # Load data
+    car_images, edge_images, _ = load_and_preprocess_data()
+
+    # Color images feature vectors
+    color_feature_vectors = np.array([extract_features_from_colored_image(img) for img in car_images])
+    color_feature_vectors = color_feature_vectors - np.mean(color_feature_vectors, axis=0)
+    color_feature_vectors = color_feature_vectors / np.std(color_feature_vectors, axis=0)
+
+    #edge images
+    edge_feature_vectors = np.array([extract_features_from_edge_image(img) for img in edge_images])
+    edge_feature_vectors = edge_feature_vectors - np.mean(edge_feature_vectors, axis=0)
+    edge_feature_vectors = edge_feature_vectors / np.std(edge_feature_vectors, axis=0)
+
 
     # Get the number of available CPUs
     num_processes = cpu_count()
 
-    # Initialize the Pool and map the function to the hyperparameters
+    # Initialize the Pool and map the function to the hyperparameters for color features
     with Pool(num_processes) as pool:
-        pool.map(train_and_visualize, params)
+        color_params = itertools.product([map_size], [color_feature_vectors], learning_rates, radii, epochs_list,
+                                         [output_directory_color])
+        pool.map(train_and_visualize, color_params)
+
+    # Initialize the Pool and map the function to the hyperparameters for edge features
+    with Pool(num_processes) as pool:
+        edge_params = itertools.product([map_size], [edge_feature_vectors], learning_rates, radii, epochs_list,
+                                        [output_directory_edge])
+        pool.map(train_and_visualize, edge_params)
+
 
 if __name__ == "__main__":
     main_parallel()
