@@ -7,6 +7,8 @@ import cv2
 import itertools
 from multiprocessing import Pool, cpu_count
 
+from src.plot import plot_images
+
 
 def unpickle(file):
     import pickle
@@ -15,14 +17,10 @@ def unpickle(file):
     return dict
 
 def load_and_preprocess_data(data_dir):
-    """Load CIFAR-10 data from `data_dir` and preprocess it to extract car images, their edge images, and their labels."""
-    
-    # Initialize the arrays
     car_images = []
     edge_images = []
     labels = []
 
-    # Loop through the files
     for batch in range(1, 6):
         file = os.path.join(data_dir, 'data_batch_' + str(batch))
         with open(file, 'rb') as fo:
@@ -41,7 +39,6 @@ def load_and_preprocess_data(data_dir):
 
 
 def extract_features_from_edge_image(edge_image):
-    """Extract features from an edge image."""
     mean_intensity = np.mean(edge_image)
     white_pixel_count = np.sum(edge_image > 0)
     std_dev = np.std(edge_image)
@@ -50,7 +47,6 @@ def extract_features_from_edge_image(edge_image):
 
 
 def extract_features_from_colored_image(image):
-    """Extract features from a colored image."""
     # Average values of RGB channels
     avg_r = np.mean(image[:, :, 0])
     avg_g = np.mean(image[:, :, 1])
@@ -205,21 +201,9 @@ def visualize_som_results(map_size, feature_vectors, learning_rates, radii, epoc
                 plt.close(fig)
 
 def main():
-    car_images, _, _ = load_and_preprocess_data()
-    feature_vectors = np.array([extract_features_from_colored_image(img) for img in car_images])
-    learning_rates = [0.1, 0.5, 0.9]
-    radii = [0.5, 1.0, 2.0]
-    epochs_list = [100, 1000, 10000]
-    map_size = (20, 20)
-    output_directory = "result/run_parallelCOLOR"
-
-    # Create all combinations of hyperparameters
-    all_params = itertools.product(
-        [map_size], [feature_vectors], learning_rates, radii, epochs_list, [output_directory]
-    )
-
-    for params in all_params:
-        train_and_visualize(params)
+    data_dir = "cifar-10-batches-py"
+    car_images, edge_images, _ = load_and_preprocess_data(data_dir)
+    plot_images(car_images, edge_images)
 
 
 def main_parallel():
