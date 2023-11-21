@@ -45,21 +45,6 @@ def extract_features_from_edge_image(edge_image):
     white_pixel_ratio = white_pixel_count / (edge_image.shape[0] * edge_image.shape[1])
     return [mean_intensity, white_pixel_count, std_dev, white_pixel_ratio]
 
-
-def extract_features_from_colored_image(image):
-    # Average values of RGB channels
-    avg_r = np.mean(image[:, :, 0])
-    avg_g = np.mean(image[:, :, 1])
-    avg_b = np.mean(image[:, :, 2])
-
-    # Standard deviation of RGB channels
-    std_r = np.std(image[:, :, 0])
-    std_g = np.std(image[:, :, 1])
-    std_b = np.std(image[:, :, 2])
-
-    return [avg_r, avg_g, avg_b, std_r, std_g, std_b]
-
-
 class SOM:
     def __init__(self, input_dim, map_size, data, learning_rate=0.5, radius=1.0):
         self.input_dim = input_dim
@@ -106,15 +91,6 @@ class SOM:
 
 
 def visualize_som_clusters(cluster_centers, samples, ax):
-    """
-    Visualizes the SOM clusters and samples.
-
-    Parameters:
-    - cluster_centers: The cluster centers obtained from the SOM.
-    - samples: The samples or data points.
-    - ax: The matplotlib axis object to plot on.
-    """
-    # Plotting cluster centers
     for center in cluster_centers:
         ax.scatter(center[0], center[1], color='black', s=100)
 
@@ -161,7 +137,6 @@ def train_and_visualize(params):
     plt.close(fig)  # Close the figure after saving
 
 def visualize_som_results(map_size, feature_vectors, learning_rates, radii, epochs_list, output_directory="result"):
-    """Visualizes the SOM results for varying learning rates, radii, and epochs. Saves plots to the specified directory."""
     for lr in learning_rates:
         for r in radii:
             for ep in epochs_list:
@@ -209,20 +184,13 @@ def main():
 def main_parallel():
     learning_rates = [0.01]
     radii = [1]
-    epochs_list = [100000]
+    epochs_list = [1]
     map_size = (20, 20)
-    output_directory_color = "result/run_parallelCOLOR"
-    output_directory_edge = "result/run_parallelEDGE"
+    output_directory_edge = "result/test"
 
     # Load data
     data_dir = "cifar-10-batches-py"
     car_images, edge_images, _ = load_and_preprocess_data(data_dir)
-
-    # Color images feature vectors
-    color_feature_vectors = np.array([extract_features_from_colored_image(img) for img in car_images])
-    color_feature_vectors = color_feature_vectors - np.mean(color_feature_vectors, axis=0)
-    color_feature_vectors = color_feature_vectors / np.std(color_feature_vectors, axis=0)
-
     #edge images
     edge_feature_vectors = np.array([extract_features_from_edge_image(img) for img in edge_images])
     edge_feature_vectors = edge_feature_vectors - np.mean(edge_feature_vectors, axis=0)
@@ -232,13 +200,6 @@ def main_parallel():
     # Get the number of available CPUs
     num_processes = cpu_count()
 
-    # Initialize the Pool and map the function to the hyperparameters for color features
-    with Pool(num_processes) as pool:
-        color_params = itertools.product([6],[map_size], [color_feature_vectors], learning_rates, radii, epochs_list,
-                                         [output_directory_color])
-        pool.map(train_and_visualize, color_params)
-
-    # Initialize the Pool and map the function to the hyperparameters for edge features
     with Pool(num_processes) as pool:
         edge_params = itertools.product([4],[map_size], [edge_feature_vectors], learning_rates, radii, epochs_list,
                                         [output_directory_edge])
