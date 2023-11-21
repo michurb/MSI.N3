@@ -1,22 +1,43 @@
 # Import necessary libraries
-import os
-from datetime import datetime
+
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 import cv2
-from keras.datasets import cifar10
 import itertools
 from multiprocessing import Pool, cpu_count
 
 
-def load_and_preprocess_data():
-    """Load CIFAR-10 data and preprocess it to extract car images, their edge images, and their labels."""
-    (x_train, y_train), _ = cifar10.load_data()
-    car_indices = np.where((y_train == 1) | (y_train == 9))[0]
-    car_images = x_train[car_indices]
-    labels = y_train[car_indices]
-    edge_images = [cv2.Canny(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), 100, 200) for img in car_images]
-    return car_images, np.array(edge_images), labels
+def unpickle(file):
+    import pickle
+    with open(file, 'rb') as fo:
+        dict = pickle.load(fo, encoding='bytes')
+    return dict
+
+def load_and_preprocess_data(data_dir):
+    """Load CIFAR-10 data from `data_dir` and preprocess it to extract car images, their edge images, and their labels."""
+    
+    # Initialize the arrays
+    car_images = []
+    edge_images = []
+    labels = []
+
+    # Loop through the files
+    for batch in range(1, 6):
+        file = os.path.join(data_dir, 'data_batch_' + str(batch))
+        with open(file, 'rb') as fo:
+            batch_data = unpickle(file)
+            for i in range(len(batch_data[b'labels'])):
+                if batch_data[b'labels'][i] == 1 or batch_data[b'labels'][i] == 9:  # labels for cars and trucks
+                    image = np.reshape(batch_data[b'data'][i], (3, 32, 32)).transpose(1, 2, 0)
+                    car_images.append(image)
+                    gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                    edge_image = cv2.Canny(gray_image, 100, 200)
+                    edge_images.append(edge_image)
+                    labels.append(batch_data[b'labels'][i])
+
+    # Convert to numpy arrays and return
+    return np.array(car_images), np.array(edge_images), np.array(labels)
 
 
 def extract_features_from_edge_image(edge_image):
@@ -120,8 +141,8 @@ def visualize_som_clusters(cluster_centers, samples, ax):
     ax.grid(True)
 
 def train_and_visualize(params):
-    map_size, feature_vectors, learning_rate, radius, epochs, output_directory = params
-    som = SOM(input_dim=6, map_size=map_size, data=feature_vectors, learning_rate=learning_rate, radius=radius)
+    input_dim, map_size, feature_vectors, learning_rate, radius, epochs, output_directory = params
+    som = SOM(input_dim=input_dim, map_size=map_size, data=feature_vectors, learning_rate=learning_rate, radius=radius)
     som.train(feature_vectors, epochs)
 
     # Extracting cluster centers from SOM weights
@@ -202,15 +223,16 @@ def main():
 
 
 def main_parallel():
-    learning_rates = [0.3, 0.1, 0.05, 0.01]
-    radii = [10, 5, 2.5, 1.25, 1]
-    epochs_list = [1, 1000, 50000]
+    learning_rates = [0.01]
+    radii = [1]
+    epochs_list = [100000]
     map_size = (20, 20)
     output_directory_color = "result/run_parallelCOLOR"
     output_directory_edge = "result/run_parallelEDGE"
 
     # Load data
-    car_images, edge_images, _ = load_and_preprocess_data()
+    data_dir = "cifar-10-batches-py"
+    car_images, edge_images, _ = load_and_preprocess_data(data_dir)
 
     # Color images feature vectors
     color_feature_vectors = np.array([extract_features_from_colored_image(img) for img in car_images])
@@ -228,13 +250,13 @@ def main_parallel():
 
     # Initialize the Pool and map the function to the hyperparameters for color features
     with Pool(num_processes) as pool:
-        color_params = itertools.product([map_size], [color_feature_vectors], learning_rates, radii, epochs_list,
+        color_params = itertools.product([6],[map_size], [color_feature_vectors], learning_rates, radii, epochs_list,
                                          [output_directory_color])
         pool.map(train_and_visualize, color_params)
 
     # Initialize the Pool and map the function to the hyperparameters for edge features
     with Pool(num_processes) as pool:
-        edge_params = itertools.product([map_size], [edge_feature_vectors], learning_rates, radii, epochs_list,
+        edge_params = itertools.product([4],[map_size], [edge_feature_vectors], learning_rates, radii, epochs_list,
                                         [output_directory_edge])
         pool.map(train_and_visualize, edge_params)
 
